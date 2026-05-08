@@ -60,7 +60,7 @@ def get_loaders(batch_size=256):
 def train(model, loader, optimizer, criterion, device):
     model.train()
     total_loss = 0.0
-    for images, labels in loader:
+    for batch_idx, (images, labels) in enumerate(loader):
         images = images.view(-1, 784).to(device)
         labels = labels.to(device)
         optimizer.zero_grad()
@@ -68,6 +68,10 @@ def train(model, loader, optimizer, criterion, device):
         loss.backward()
         optimizer.step()
         total_loss += loss.item()
+        
+        if (batch_idx + 1) % 100 == 0:
+            print(f"      [Batch {batch_idx+1}/{len(loader)}] Current Loss: {loss.item():.4f}")
+            
     return total_loss / len(loader)
 
 

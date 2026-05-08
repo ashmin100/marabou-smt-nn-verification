@@ -132,7 +132,8 @@ print(f"      Added {len(equations)} disjunctive output constraints.")
 
 # ── Run Marabou ───────────────────────────────────────────────────────────────
 print(f"\n[4/4] Running Marabou verification...")
-options = Marabou.createOptions(timeoutInSeconds=args.timeout, verbosity=0)
+print("      (Marabou internal solver logs will be printed below)")
+options = Marabou.createOptions(timeoutInSeconds=args.timeout, verbosity=2)
 
 t_start = time.time()
 result  = network.solve(options=options)
