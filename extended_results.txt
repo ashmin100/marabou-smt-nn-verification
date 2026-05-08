@@ -1,8 +1,0 @@
-In-depth Experiment Results
-===========================
-Epsilon: 0.08 | Verdict: UNSAT   | Time: 7.03s
-Epsilon: 0.10 | Verdict: UNSAT   | Time: 40.82s
-Epsilon: 0.12 | Verdict: UNSAT   | Time: 248.83s
-Epsilon: 0.15 | Verdict: SAT     | Time: 66.20s
-  Adversarial details found in output:
-    Adversarial class predicted: 3  (true: 7)
