@@ -23,18 +23,28 @@ Unlike gradient-based attacks (FGSM, PGD) that only *search* for adversarial exa
 
 ## Key Results
 
-Full sweep from ε = 0.01 to ε = 0.20 with physical pixel-bound clamping:
+Two-phase experiment: (1) scan 100 test images at ε=0.05 to find SAT samples, (2) sweep ε ∈ [0.01, 0.20] on three representative samples.
 
-| ε (normalized) | ε (raw pixels, ÷255) | Verdict | Runtime |
-|:--------------:|:--------------------:|:-------:|--------:|
-| 0.01 | ~0.8/255 | **UNSAT** | 0.51s |
-| 0.05 | ~4.0/255 | **UNSAT** | 0.47s |
-| 0.10 | ~8.1/255 | **UNSAT** | 0.95s |
-| 0.15 | ~12.1/255 | **UNSAT** | 12.80s |
-| 0.18 | ~14.6/255 | **UNSAT** | 138.20s |
-| 0.20 | ~16.2/255 | **UNSAT** | 300.60s |
+**Robustness boundaries per sample:**
 
-> **Finding:** The network is provably robust across the full sweep. Physical bounds clamping reduced runtime at ε=0.12 from 248s → 6s (40× speedup) and eliminated a False SAT at ε=0.15.
+| Sample | True Label | ε* (boundary) | Certified up to | Adversarial class |
+|:------:|:----------:|:-------------:|:---------------:|:-----------------:|
+| idx=0 | 7 | > 0.20 | ≥ 0.20 (full range) | — |
+| idx=8 | 5 | ≈ 0.03 | 0.02 | 6 |
+| idx=33 | 4 | ≈ 0.05 | 0.04 | 0 |
+
+**Runtime comparison at selected ε:**
+
+| ε (normalized) | ε (÷255) | idx=0 runtime | idx=8 runtime | idx=33 runtime |
+|:--------------:|:--------:|:-------------:|:-------------:|:--------------:|
+| 0.03 | ~2.4/255 | UNSAT  0.5s | **SAT  0.5s** | UNSAT  0.5s |
+| 0.05 | ~4.0/255 | UNSAT  0.5s | SAT  0.8s | **SAT  0.5s** |
+| 0.15 | ~12.1/255 | UNSAT  14.3s | SAT  1.1s | SAT  0.5s |
+| 0.20 | ~16.2/255 | UNSAT  300.5s | SAT  0.6s | SAT  0.5s |
+
+> **Key insight:** SAT queries terminate in sub-second (witness found immediately). UNSAT at large ε requires exhausting a 2^96 branch-and-bound tree — up to 300 s. This asymmetry is intrinsic to complete verification of an NP-hard property.
+>
+> **False SAT fix:** Removing physical bounds clamping (`[-0.4242, 2.8215]`) inflated ε=0.12 runtime from 6s → 248s and produced a spurious SAT at ε=0.15.
 
 ---
 
@@ -80,6 +90,8 @@ cmake --build . -j 4
 export PYTHONPATH=/path/to/Marabou:$PYTHONPATH
 ```
 
+Replace `/path/to/Marabou` with the actual cloned directory path.
+
 ### 3. Install Python dependencies
 
 ```bash
@@ -98,7 +110,7 @@ python train_model.py
 
 Outputs: `models/mnist_fc.onnx`, `models/sample_inputs.npy`, `models/sample_labels.npy`
 
-**Step 2 — Run verification**
+**Step 2 — Run a single verification query**
 
 ```bash
 python test.py [--epsilon FLOAT] [--sample-idx INT] [--timeout INT]
@@ -110,51 +122,45 @@ python test.py [--epsilon FLOAT] [--sample-idx INT] [--timeout INT]
 | `--sample-idx` | `0` | Index into saved test samples |
 | `--timeout` | `300` | Solver timeout in seconds |
 
-**Examples**
-
 ```bash
-python test.py --epsilon 0.05 --sample-idx 2
-python test.py --epsilon 0.15 --timeout 600
+python test.py --epsilon 0.05 --sample-idx 8    # SAT — adversarial example found
+python test.py --epsilon 0.15 --sample-idx 0    # UNSAT — certified robust
 ```
 
-**Step 3 — Run full epsilon sweep**
+**Step 3 — Run two-phase experiment sweep**
 
 ```bash
-python run_experiments.py   # sweeps ε = 0.01 → 0.20, writes results/results.md
+python run_experiments.py
+# Phase 1: scan samples 0–99 at ε=0.05 to find SAT samples
+# Phase 2: sweep ε=0.01→0.20 on baseline + discovered SAT samples
+# Output: results/results.md
 ```
 
 **Step 4 — Visualize results**
 
 ```bash
-python visualize_results.py  # plots runtime vs epsilon, saves results/verification_results.png
+python visualize_results.py
+# Generates 3-sample runtime bar charts + verdict heatmap
+# Output: results/verification_results.png
 ```
 
 ---
 
-## Expected Output
+## Expected Output (SAT example)
 
 ```
 ============================================================
 Marabou Local Robustness Verification
 ============================================================
-  Model:       models/mnist_fc.onnx
-  Sample idx:  0  (true label: 7)
-  Epsilon:     0.01  (L-inf ball)
-  Timeout:     300s
+  Sample idx:  8  (true label: 5)
+  Epsilon:     0.03  (L-inf ball)
 ============================================================
+  Verdict:  SAT (counterexample found)
+  Meaning:  An adversarial input exists within the L-inf ball.
 
-[1/4] Loading ONNX model into Marabou...
-[2/4] Setting input constraints (L-inf ball, epsilon=0.01)...
-[3/4] Setting output constraints (violation: any class j≠7 wins)...
-[4/4] Running Marabou verification...
-
-============================================================
-RESULT
-============================================================
-  Verification time: 0.51s
-  Verdict:  UNSAT
-  Meaning:  The network always predicts class 7
-            for all inputs within the L-inf ball of radius 0.01.
+  Adversarial class predicted: 6  (true: 5)
+  Max perturbation (L-inf):    0.029997
+  Output logits (adversarial): [-2.1  0.8  1.3  0.4  2.1  4.9  5.1 -0.9  1.2  0.6]
 ============================================================
 ```
 
@@ -168,17 +174,18 @@ RESULT
 ├── requirements.txt
 ├── train_model.py          # Train MNIST FC network + ONNX export
 ├── test.py                 # Marabou verification query (main entry point)
-├── run_experiments.py      # Full epsilon sweep (0.01 → 0.20)
-├── visualize_results.py    # Plot verification time vs epsilon
+├── run_experiments.py      # Two-phase experiment (sample scan + ε sweep)
+├── visualize_results.py    # Runtime bar charts + verdict heatmap
 ├── exploration_report.md   # Survey of Marabou built-in resources (Problem 1)
-├── report.md               # Analysis report
+├── report.md               # Analysis report (EN)
+├── report_ko.md            # Analysis report (KO)
 ├── models/
 │   ├── mnist_fc.onnx       # Trained model (generated by train_model.py)
 │   ├── sample_inputs.npy   # Test samples  (generated)
 │   └── sample_labels.npy   # Labels        (generated)
 └── results/
-    ├── results.md          # Full sweep results table
-    └── verification_results.png
+    ├── results.md                  # Full sweep results table
+    └── verification_results.png   # Runtime + verdict visualization
 ```
 
 ---
