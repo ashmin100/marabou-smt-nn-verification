@@ -103,7 +103,7 @@ def export_onnx(model, path, device):
 
 
 # ── Save sample inputs for test.py ───────────────────────────────────────────
-def save_samples(model, loader, device, n_samples=10):
+def save_samples(model, loader, device):
     """
     Save n correctly-classified samples per class for use in verification.
     Saves normalized pixel values in [-1, ~3] range (post-normalization).

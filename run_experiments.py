@@ -19,7 +19,7 @@ import subprocess
 import time
 import os
 
-MARABOU_PATH = "/Users/ashmin/Desktop/python_workspace/신뢰할수있는인공지능/과제3/Marabou_src"
+MARABOU_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Marabou_src")
 SCAN_EPSILON  = 0.05
 SCAN_TIMEOUT  = 60          # seconds per query in Phase 1
 SWEEP_TIMEOUT = 300         # seconds per query in Phase 2

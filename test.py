@@ -52,7 +52,7 @@ for path in [ONNX_PATH, SAMPLE_PATH, LABELS_PATH]:
 
 # ── Import Marabou (requires PYTHONPATH to Marabou root) ─────────────────────
 try:
-    from maraboupy import Marabou, MarabouUtils, MarabouCore
+    from maraboupy import Marabou, MarabouUtils, MarabouCore  # type: ignore
 except ImportError:
     sys.exit(
         "[ERROR] Could not import maraboupy.\n"
@@ -147,15 +147,7 @@ print("RESULT")
 print("=" * 60)
 print(f"  Verification time: {elapsed:.2f}s")
 
-# Handle both return-value conventions
-if isinstance(result, (list, tuple)) and len(result) == 3:
-    exit_code, vals, stats = result
-elif isinstance(result, (list, tuple)) and len(result) == 2:
-    vals, stats = result
-    exit_code = "sat" if len(vals) > 0 else "unsat"
-else:
-    vals = result
-    exit_code = "sat" if (isinstance(vals, dict) and len(vals) > 0) else "unsat"
+exit_code, vals, stats = result
 
 if exit_code == "unsat" or len(vals) == 0:
     # UNSAT: no counterexample found → property holds
