@@ -2,14 +2,14 @@ import subprocess
 import time
 import os
 
-epsilons = [0.08, 0.10, 0.12, 0.15]
+epsilons = [round(x * 0.01, 2) for x in range(1, 21)]
 env = os.environ.copy()
 env["PYTHONPATH"] = "/Users/ashmin/Desktop/python_workspace/신뢰할수있는인공지능/과제3/Marabou_src"
 
 results = []
 
 print("Starting in-depth verification experiments...")
-with open("extended_results.txt", "w") as f:
+with open("results/results.md", "w") as f:
     f.write("In-depth Experiment Results\n")
     f.write("===========================\n")
 
@@ -38,7 +38,7 @@ for eps in epsilons:
     res_str = f"Epsilon: {eps:.2f} | Verdict: {verdict:7s} | Time: {elapsed:.2f}s\n"
     print(res_str.strip())
     
-    with open("extended_results.txt", "a") as f:
+    with open("results/results.md", "a") as f:
         f.write(res_str)
         # Log SAT details if any
         if verdict == "SAT":

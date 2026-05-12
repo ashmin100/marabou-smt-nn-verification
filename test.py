@@ -97,11 +97,13 @@ print(f"      Output vars: {len(output_vars)}")
 # ── Set input constraints (L-inf ball around x) ───────────────────────────────
 print(f"\n[2/4] Setting input constraints (L-inf ball, epsilon={epsilon})...")
 
-# Pixel values after MNIST normalization are approximately in [-2.8, 2.8].
-# We clamp the perturbed bounds to avoid going out of the normalized range.
+# Pixel values after MNIST normalization are strictly in [-0.4242, 2.8215].
+# (0.0 - 0.1307) / 0.3081 = -0.4242
+# (1.0 - 0.1307) / 0.3081 =  2.8215
+# We clamp the perturbed bounds to avoid physically impossible pixel values.
 for i, var in enumerate(input_vars):
-    lb = float(x[i]) - epsilon
-    ub = float(x[i]) + epsilon
+    lb = max(-0.4242, float(x[i]) - epsilon)
+    ub = min(2.8215, float(x[i]) + epsilon)
     network.setLowerBound(var, lb)
     network.setUpperBound(var, ub)
 
