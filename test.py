@@ -177,4 +177,45 @@ else:
     print(f"  Max perturbation (L-inf):    {np.max(np.abs(adv_input - x)):.6f}")
     print(f"  Output logits (adversarial): {np.round(adv_output, 4)}")
 
+    # ── Visualize the adversarial example ────────────────────────────────────
+    # Denormalize from MNIST space (mean=0.1307, std=0.3081) back to [0,1] pixels.
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        x_img   = (x.reshape(28, 28)         * 0.3081 + 0.1307).clip(0, 1)
+        adv_img = (adv_input.reshape(28, 28) * 0.3081 + 0.1307).clip(0, 1)
+        diff    = adv_img - x_img  # signed perturbation map
+
+        fig, axes = plt.subplots(1, 3, figsize=(9, 3.2))
+
+        axes[0].imshow(x_img, cmap="gray", vmin=0, vmax=1)
+        axes[0].set_title(f"Original  (label: {label})", fontsize=11)
+        axes[0].axis("off")
+
+        axes[1].imshow(adv_img, cmap="gray", vmin=0, vmax=1)
+        axes[1].set_title(f"Adversarial  (pred: {adv_class})", fontsize=11)
+        axes[1].axis("off")
+
+        im = axes[2].imshow(diff, cmap="RdBu_r", vmin=-0.15, vmax=0.15)
+        axes[2].set_title(f"Perturbation  (ε={epsilon})", fontsize=11)
+        axes[2].axis("off")
+        plt.colorbar(im, ax=axes[2], fraction=0.046, pad=0.04)
+
+        fig.suptitle(
+            f"Adversarial Example — idx={idx}, ε={epsilon}, "
+            f"true:{label} → predicted:{adv_class}",
+            fontsize=12, fontweight="bold",
+        )
+        plt.tight_layout()
+
+        os.makedirs("results", exist_ok=True)
+        save_path = f"results/adversarial_idx{idx}_eps{epsilon}.png"
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.close()
+        print(f"\n  Adversarial image saved → {save_path}")
+    except Exception as e:
+        print(f"\n  (Visualization skipped: {e})")
+
 print("=" * 60)
