@@ -1,126 +1,123 @@
 Exploration of the Marabou Resources Directory
 ================================================
 
-Source: https://github.com/NeuralNetworkVerification/Marabou/tree/master/resources
+> **Problem 1 — Survey of built-in benchmarks, models, and example queries**
+> Source: https://github.com/NeuralNetworkVerification/Marabou/tree/master/resources
 
-This document surveys the built-in benchmarks and example files provided
-with the Marabou neural network verification framework.
+---
 
+## Table of Contents
 
-1. NEURAL NETWORK MODELS
--------------------------
+1. [Neural Network Models](#1-neural-network-models)
+2. [Property / Specification Files](#2-property--specification-files)
+3. [Example Scripts and Notebooks](#3-example-scripts-and-notebooks)
+4. [Summary Table](#4-summary-table)
+5. [Observations for Model Selection](#5-observations-for-model-selection)
 
-1.1 nnet/ directory — NNet format (.nnet)
-  Marabou's original native format. Each file encodes network weights, biases,
-  and input normalization parameters in a plain-text format.
+---
 
-  Sub-folders:
-  - acasxu/  : ACAS Xu (Airborne Collision Avoidance System X Unmanned)
-                45 networks (ACASXU_experimental_v2a_N_M.nnet, N in 1-5, M in 1-9)
-                Architecture: 5 inputs, 6 hidden layers × 50 neurons, 5 outputs
-                Task: aircraft advisory system (Clear-of-Conflict, weak/strong left/right)
-                Source: Katz et al., 2017 (Reluplex paper)
+## 1. Neural Network Models
 
-  - coav/    : CollisionAvoidance benchmarks from the Planet paper
-                Small networks for UAV collision avoidance scenarios
+### 1.1 `nnet/` — NNet format (`.nnet`)
 
-  - twin/    : TwinStreams benchmarks from the Planet repository
-                Used to test multi-output verification
+Marabou's original native plain-text format encoding weights, biases, and input normalization.
 
-  - mnist/   : mnist10x10.nnet — a tiny MNIST classifier (10×10 hidden layers)
-                Used in the parallelism demo (runMarabou.py)
+| Sub-directory | Networks | Architecture | Task |
+|---|---|---|---|
+| `acasxu/` | 45 networks | 5-in · 6×50 hidden · 5-out | Aircraft collision avoidance advisories (Reluplex, Katz et al. 2017) |
+| `coav/` | several | small FC | UAV collision avoidance (Planet paper) |
+| `twin/` | several | small FC | Multi-output verification (TwinStreams) |
+| `mnist/` | 1 (`mnist10x10.nnet`) | 10×10 hidden layers | Tiny MNIST classifier (parallelism demo) |
 
-1.2 onnx/ directory — ONNX format (.onnx)
-  Marabou 2.0 uses ONNX as its primary format. Files here include small
-  feed-forward networks for testing the ONNX parsing pipeline.
+### 1.2 `onnx/` — ONNX format (`.onnx`)
 
-1.3 keras/ directory
-  Keras/TensorFlow (.pb or SavedModel) format networks.
-  Marabou can parse these via its TensorFlow interface.
+Marabou 2.0 uses ONNX as its **primary format**. This directory contains small feed-forward networks for testing the ONNX parsing pipeline.
 
-1.4 mps/ directory
-  Linear programming problem files in MPS format.
-  Used for solver-level benchmarks, not DNN verification.
+### 1.3 `keras/` — Keras / TensorFlow (`.pb` / SavedModel)
 
-1.5 bnn_queries/ directory
-  Binary Neural Network (BNN) verification queries.
-  These use {-1, +1} weights and test Marabou's BNN support.
+Networks exportable from TF/Keras, parsed via Marabou's TensorFlow interface.
 
+### 1.4 `mps/` — Linear Programming (`.mps`)
 
-2. PROPERTY FILES
-------------------
+LP benchmark files used for solver-level testing — not DNN verification.
 
-2.1 properties/acas_property_1.txt
-  Safety property P1: "If the intruder is far away and there is no danger,
-  the network output should not advise a Strong Right turn."
-  Input: x[0] in [55947.691, 60760.0], x[1] in [-3.141592, 3.141592], etc.
-  Output: y[0] <= 3.9911256459
+### 1.5 `bnn_queries/` — Binary Neural Networks
 
-2.2 properties/acas_property_2.txt
-  Property P2: "If the intruder is far away, output 0 (COC) should be maximal."
+Verification queries for BNNs using `{−1, +1}` weights, testing Marabou's BNN support.
 
-2.3 properties/acas_property_3.txt
-  Property P3: "COC is not the minimal advisory for a specific input region."
+---
 
-2.4 properties/acas_property_4.txt
-  Property P4: "The network should not output COC for a specific dangerous scenario."
+## 2. Property / Specification Files
 
-2.5 properties/builtin_property.txt
-  A generic collision avoidance property embedded in the final network layer,
-  used for coav/ and twin/ benchmarks.
+### ACAS Xu safety properties (`properties/acas_property_*.txt`)
 
-2.6 properties/mnist/ directory
-  MNIST-specific property files, e.g.:
-    image3_target6_epsilon0.05.txt
-  Format: sets L-inf bounds on all 784 pixel inputs around a reference image
-  and constrains the output to match the true class.
+| File | Property | Description |
+|---|---|---|
+| `acas_property_1.txt` | P1 | If intruder is far away, do **not** advise Strong Right turn |
+| `acas_property_2.txt` | P2 | If intruder is far away, COC output must be maximal |
+| `acas_property_3.txt` | P3 | COC is **not** the minimal advisory for a specific input region |
+| `acas_property_4.txt` | P4 | COC must not be output in a specific dangerous scenario |
 
+Each file specifies input bounds (box constraints) and output constraints in Marabou's line-by-line syntax. For example, `acas_property_1.txt` encodes: `x[0] ∈ [55947.691, 60760.0]`, `y[0] ≤ 3.9911256459`.
 
-3. EXAMPLE SCRIPTS AND NOTEBOOKS
-----------------------------------
+### MNIST properties (`properties/mnist/`)
 
-3.1 runMarabou.py
-  Command-line runner script that demonstrates:
-  - Loading a .nnet model
-  - Loading a property file
-  - Running with multiple workers (parallelism)
-  Usage example from README:
-    ./resources/runMarabou.py resources/nnet/mnist/mnist10x10.nnet \
-      resources/properties/mnist/image3_target6_epsilon0.05.txt --num-workers=4
+Files like `image3_target6_epsilon0.05.txt` encode:
+- L∞ bounds on all 784 pixel inputs around a reference image
+- Output constraint: network must predict the true class
 
-3.2 SplitAndConquerGuide.ipynb
-  A Jupyter Notebook walkthrough of the Split-and-Conquer (SNC) mode.
-  SNC decomposes a hard verification query into 2^n sub-problems solved
-  in parallel, which can dramatically reduce wall-clock time on large queries.
+This is the same query structure implemented in `test.py`.
 
-3.3 fashion.ipq
-  A serialized Marabou internal query (.ipq format) for a Fashion-MNIST network.
-  Can be loaded directly into Marabou without going through ONNX/nnet parsing.
+### `properties/builtin_property.txt`
 
+A generic collision avoidance property embedded in the final network layer, used for `coav/` and `twin/` benchmarks.
 
-4. SUMMARY TABLE
------------------
+---
 
-Category          | Files/Formats          | Notes
-------------------+------------------------+-----------------------------------
-Network formats   | .nnet, .onnx, .pb      | ONNX is the primary format in v2.0
-Benchmark suites  | ACAS Xu, coav, twin,   | ACAS Xu is the canonical benchmark
-                  | MNIST, Fashion-MNIST   |
-Property format   | .txt (custom syntax)   | Line-by-line input/output bounds
-                  | .vnnlib               | VNN-COMP standard format supported
-Example scripts   | runMarabou.py, .ipynb  | Shows parallel + SNC usage
-Serialized query  | .ipq                   | Marabou internal format
+## 3. Example Scripts and Notebooks
 
+### `runMarabou.py`
 
-5. KEY OBSERVATIONS FOR MODEL SELECTION (Problem 2)
------------------------------------------------------
+Command-line runner demonstrating loading a `.nnet` model, loading a property file, and parallel verification with multiple workers:
 
-- The ACAS Xu .nnet networks are small (5-in, 5-out, 50 neurons/layer) but
-  the 45 pre-loaded networks are already part of the resources directory.
+```bash
+./resources/runMarabou.py resources/nnet/mnist/mnist10x10.nnet \
+  resources/properties/mnist/image3_target6_epsilon0.05.txt --num-workers=4
+```
 
-- The mnist10x10.nnet is also already included.
+### `SplitAndConquerGuide.ipynb`
 
-- For Problem 2, a model NOT in this directory is required.
-  Recommended: train a custom MNIST FC network in PyTorch and export to .onnx.
-  The ONNX format is Marabou 2.0's primary supported format and allows
-  straightforward use of the Python API (Marabou.read_onnx()).
+Jupyter notebook walkthrough of **Split-and-Conquer (SNC)** mode — decomposes a hard query into 2ⁿ sub-problems solved in parallel, dramatically reducing wall-clock time on large queries.
+
+### `fashion.ipq`
+
+A serialized Marabou internal query (`.ipq` format) for a Fashion-MNIST network. Can be loaded directly without going through ONNX/nnet parsing, useful for exact reproducibility of solver-level benchmarks.
+
+---
+
+## 4. Summary Table
+
+| Category | Files / Formats | Notes |
+|---|---|---|
+| Network formats | `.nnet`, `.onnx`, `.pb` | ONNX is the primary format in v2.0 |
+| Benchmark suites | ACAS Xu, coav, twin, MNIST, Fashion-MNIST | ACAS Xu is the canonical benchmark |
+| Property format | `.txt` (custom syntax), `.vnnlib` | VNN-COMP standard format supported |
+| Example scripts | `runMarabou.py`, `.ipynb` | Shows parallel + SNC usage |
+| Serialized query | `.ipq` | Marabou internal format for reproducibility |
+
+---
+
+## 5. Observations for Model Selection
+
+The following models are **already included** in the resources directory and must be excluded per the assignment requirements:
+
+- All 45 ACAS Xu `.nnet` networks
+- `mnist10x10.nnet` (tiny MNIST classifier)
+- ONNX test networks in `onnx/`
+
+**Selected approach for Problem 2:** Train a custom MNIST fully-connected network in PyTorch and export to `.onnx` (opset 11).
+
+Rationale:
+- ONNX is Marabou 2.0's primary supported format (`Marabou.read_onnx()`)
+- A 784→64→32→10 architecture is small enough to avoid timeouts while being non-trivial
+- MNIST provides unambiguous ground-truth labels and is the canonical local robustness benchmark

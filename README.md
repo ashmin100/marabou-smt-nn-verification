@@ -1,30 +1,75 @@
-# Marabou MNIST Robustness Verification
+# Neural Network Verification with Marabou
 
-Formal verification of neural network local robustness using [Marabou](https://github.com/NeuralNetworkVerification/Marabou).
+> Formal, SMT-based local robustness verification of an MNIST classifier — proving that no adversarial perturbation within an L∞ ball can flip the predicted class.
 
-A small fully-connected network trained on MNIST is verified against L-inf perturbation attacks using SMT-based complete verification.
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue?logo=python)
+![Framework](https://img.shields.io/badge/Verifier-Marabou%202.0-orange)
+![Model](https://img.shields.io/badge/Model-ONNX%20opset%2011-lightgrey)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-## What this does
+---
 
-- Trains a 784→64→32→10 FC network on MNIST (>97% test accuracy)
-- Exports it to ONNX format
-- Uses Marabou to formally verify: *"For a given input x classified as digit d, all inputs x' with ||x'−x||∞ ≤ ε are also classified as d"*
+## Overview
+
+This project applies [Marabou](https://github.com/NeuralNetworkVerification/Marabou) (Katz et al., CAV 2019) to formally verify **local robustness** of a small fully-connected network trained on MNIST.
+
+Unlike gradient-based attacks (FGSM, PGD) that only *search* for adversarial examples, Marabou gives a **complete proof**: an UNSAT result guarantees that *no* input within the perturbation region can change the predicted class.
+
+```
+∀x' s.t. ‖x' − x‖_∞ ≤ ε  ⟹  argmax f(x') = d
+```
+
+---
+
+## Key Results
+
+Full sweep from ε = 0.01 to ε = 0.20 with physical pixel-bound clamping:
+
+| ε (normalized) | ε (raw pixels, ÷255) | Verdict | Runtime |
+|:--------------:|:--------------------:|:-------:|--------:|
+| 0.01 | ~0.8/255 | **UNSAT** | 0.51s |
+| 0.05 | ~4.0/255 | **UNSAT** | 0.47s |
+| 0.10 | ~8.1/255 | **UNSAT** | 0.95s |
+| 0.15 | ~12.1/255 | **UNSAT** | 12.80s |
+| 0.18 | ~14.6/255 | **UNSAT** | 138.20s |
+| 0.20 | ~16.2/255 | **UNSAT** | 300.60s |
+
+> **Finding:** The network is provably robust across the full sweep. Physical bounds clamping reduced runtime at ε=0.12 from 248s → 6s (40× speedup) and eliminated a False SAT at ε=0.15.
+
+---
+
+## Architecture
+
+```
+MNIST image (28×28)
+       │
+       ▼
+  Flatten → [784]
+       │
+  Linear(784→64) + ReLU
+       │
+  Linear(64→32)  + ReLU
+       │
+  Linear(32→10)
+       │
+  argmax → predicted digit
+```
+
+**Test accuracy:** ~97.5%  |  **Format:** ONNX opset 11  |  **Parameters:** ~55,000
+
+---
 
 ## Setup
 
 ### 1. Build Marabou from source
 
-Marabou must be built from source (Python 3.8–3.11 pip wheels are available,
-but source build is used here to support any Python version).
-
 ```bash
-# Install build dependencies (macOS)
+# macOS dependencies
 brew install cmake boost wget
 
 # Clone and build
 git clone https://github.com/NeuralNetworkVerification/Marabou/
-cd Marabou
-mkdir build && cd build
+cd Marabou && mkdir build && cd build
 cmake ../ -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 cmake --build . -j 4
 ```
@@ -35,48 +80,58 @@ cmake --build . -j 4
 export PYTHONPATH=/path/to/Marabou:$PYTHONPATH
 ```
 
-Replace `/path/to/Marabou` with the actual path to your cloned Marabou directory.
-
 ### 3. Install Python dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## Running
+---
 
-### Step 1 — Train the model
+## Usage
+
+**Step 1 — Train & export model**
 
 ```bash
 python train_model.py
 ```
 
-Trains the MNIST FC network for 5 epochs and saves:
-- `models/mnist_fc.onnx` — the exported model
-- `models/sample_inputs.npy` — correctly-classified test samples
-- `models/sample_labels.npy` — corresponding labels
+Outputs: `models/mnist_fc.onnx`, `models/sample_inputs.npy`, `models/sample_labels.npy`
 
-### Step 2 — Run Marabou verification
+**Step 2 — Run verification**
 
 ```bash
-python test.py
+python test.py [--epsilon FLOAT] [--sample-idx INT] [--timeout INT]
 ```
-
-Optional arguments:
 
 | Flag | Default | Description |
-|------|---------|-------------|
-| `--epsilon` | `0.01` | L-inf perturbation radius |
-| `--sample-idx` | `0` | Which sample to verify |
-| `--timeout` | `300` | Verification timeout (seconds) |
+|------|:-------:|-------------|
+| `--epsilon` | `0.01` | L∞ perturbation radius (normalized) |
+| `--sample-idx` | `0` | Index into saved test samples |
+| `--timeout` | `300` | Solver timeout in seconds |
 
-Example with custom epsilon:
+**Examples**
 
 ```bash
-python test.py --epsilon 0.005 --sample-idx 3
+python test.py --epsilon 0.05 --sample-idx 2
+python test.py --epsilon 0.15 --timeout 600
 ```
 
-## Expected output
+**Step 3 — Run full epsilon sweep**
+
+```bash
+python run_experiments.py   # sweeps ε = 0.01 → 0.20, writes results/results.md
+```
+
+**Step 4 — Visualize results**
+
+```bash
+python visualize_results.py  # plots runtime vs epsilon, saves results/verification_results.png
+```
+
+---
+
+## Expected Output
 
 ```
 ============================================================
@@ -87,27 +142,48 @@ Marabou Local Robustness Verification
   Epsilon:     0.01  (L-inf ball)
   Timeout:     300s
 ============================================================
-...
+
+[1/4] Loading ONNX model into Marabou...
+[2/4] Setting input constraints (L-inf ball, epsilon=0.01)...
+[3/4] Setting output constraints (violation: any class j≠7 wins)...
+[4/4] Running Marabou verification...
+
+============================================================
 RESULT
 ============================================================
-  Verification time: 12.43s
+  Verification time: 0.51s
   Verdict:  UNSAT
   Meaning:  The network always predicts class 7
             for all inputs within the L-inf ball of radius 0.01.
+============================================================
 ```
 
-## Repository structure
+---
+
+## Repository Structure
 
 ```
 .
 ├── README.md
 ├── requirements.txt
-├── train_model.py      # Train MNIST FC + export to ONNX
-├── test.py             # Marabou verification query
-├── exploration.md      # Survey of Marabou built-in resources
-├── report.txt          # Analysis report (convert to PDF for submission)
-└── models/
-    ├── mnist_fc.onnx           # Trained model (generated)
-    ├── sample_inputs.npy       # Test samples  (generated)
-    └── sample_labels.npy       # Sample labels (generated)
+├── train_model.py          # Train MNIST FC network + ONNX export
+├── test.py                 # Marabou verification query (main entry point)
+├── run_experiments.py      # Full epsilon sweep (0.01 → 0.20)
+├── visualize_results.py    # Plot verification time vs epsilon
+├── exploration_report.md   # Survey of Marabou built-in resources (Problem 1)
+├── report.md               # Analysis report
+├── models/
+│   ├── mnist_fc.onnx       # Trained model (generated by train_model.py)
+│   ├── sample_inputs.npy   # Test samples  (generated)
+│   └── sample_labels.npy   # Labels        (generated)
+└── results/
+    ├── results.md          # Full sweep results table
+    └── verification_results.png
 ```
+
+---
+
+## References
+
+- Katz, G. et al. *The Marabou Framework for Verification and Analysis of Deep Neural Networks.* CAV 2019.
+- Szegedy, C. et al. *Intriguing Properties of Neural Networks.* ICLR 2014.
